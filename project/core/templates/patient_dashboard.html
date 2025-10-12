@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Dashboard - Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1>Welcome, {{ user.username }}</h1>
+    
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <h2>Your Appointments</h2>
+            {% if appointments %}
+                <div class="appointment-list">
+                    {% for appointment in appointments %}
+                        <div class="appointment-item">
+                            <div class="appointment-header">
+                                <h3>Dr. {{ appointment.doctor.user.get_full_name|default:appointment.doctor.user.username }}</h3>
+                                <span class="status {{ appointment.status }}">{{ appointment.status|title }}</span>
+                            </div>
+                            <p><strong>Date:</strong> {{ appointment.date }}</p>
+                            <p><strong>Time:</strong> {{ appointment.time }}</p>
+                            {% if appointment.meeting_link and appointment.status == 'confirmed' %}
+                                <a href="{{ appointment.meeting_link }}" class="btn btn-primary" target="_blank">Join Meeting</a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>No appointments scheduled.</p>
+                <a href="{% url 'appointments' %}" class="btn">Book an Appointment</a>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-card">
+            <h2>Health Records</h2>
+            <div class="health-records">
+                <!-- Health records will be loaded dynamically -->
+                <div id="health-records-list">Loading...</div>
+            </div>
+            <button class="btn" onclick="uploadHealthRecord()">Upload New Record</button>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>Medicine Tracker</h2>
+            <div class="medicine-search">
+                <input type="text" id="medicine-search" placeholder="Search for medicines...">
+                <button class="btn" onclick="searchMedicines()">Search</button>
+            </div>
+            <div id="medicine-results">
+                <!-- Medicine search results will appear here -->
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>AI Symptom Checker</h2>
+            <div class="symptom-checker">
+                <textarea id="symptoms" placeholder="Describe your symptoms..."></textarea>
+                <button class="btn" onclick="checkSymptoms()">Check Symptoms</button>
+                <div id="symptom-results">
+                    <!-- AI analysis results will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.dashboard-container {
+    padding: 2rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.appointment-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.appointment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.status.pending {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status.confirmed {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status.cancelled {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.status.completed {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+.health-records, .medicine-search, .symptom-checker {
+    margin-top: 1rem;
+}
+
+textarea#symptoms {
+    width: 100%;
+    min-height: 100px;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#medicine-search {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function uploadHealthRecord() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pdf,.jpg,.png,.doc,.docx';
+    
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('record_type', 'document');
+        formData.append('description', 'Uploaded health record');
+        
+        fetch('/api/health-records/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.id) {
+                loadHealthRecords();
+            } else {
+                alert('Failed to upload health record');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to upload health record');
+        });
+    };
+    
+    fileInput.click();
+}
+
+function searchMedicines() {
+    const query = document.getElementById('medicine-search').value;
+    if (!query) {
+        alert('Please enter a medicine name to search');
+        return;
+    }
+    
+    fetch(`/api/medicines/search/?query=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('medicine-results');
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<p>No medicines found</p>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = data.map(medicine => `
+                <div class="medicine-item">
+                    <h4>${medicine.name}</h4>
+                    <p><strong>Manufacturer:</strong> ${medicine.manufacturer}</p>
+                    <p>${medicine.description}</p>
+                    <h5>Available at:</h5>
+                    <ul>
+                        ${medicine.available_at.map(location => `
+                            <li>
+                                ${location.pharmacy_name}
+                                <br>Address: ${location.pharmacy_address}
+                                <br>Stock: ${location.stock}
+                                <br>Price: ₹${location.price}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `).join('');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to search medicines');
+        });
+}
+
+function checkSymptoms() {
+    const symptoms = document.getElementById('symptoms').value;
+    if (!symptoms) {
+        alert('Please describe your symptoms');
+        return;
+    }
+    
+    fetch('/api/symptoms/analyze/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ symptoms: symptoms })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultsDiv = document.getElementById('symptom-results');
+        resultsDiv.innerHTML = `
+            <div class="analysis-results">
+                <h4>Analysis Results</h4>
+                <p><strong>Possible Conditions:</strong></p>
+                <ul>
+                    ${data.possible_conditions.map(condition => `<li>${condition}</li>`).join('')}
+                </ul>
+                <p><strong>Severity Level:</strong> ${data.severity}</p>
+                <p><strong>Recommendation:</strong> ${data.recommendation}</p>
+            </div>
+        `;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to analyze symptoms');
+    });
+}
+
+// Load health records on page load
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/health-records/')
+        .then(response => response.json())
+        .then(data => {
+            const recordsList = document.getElementById('health-records-list');
+            if (data.length === 0) {
+                recordsList.innerHTML = '<p>No health records found.</p>';
+            } else {
+                recordsList.innerHTML = data.map(record => `
+                    <div class="health-record">
+                        <h4>${record.record_type}</h4>
+                        <p>${record.date}</p>
+                        <a href="${record.file}" target="_blank">View Record</a>
+                    </div>
+                `).join('');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading health records:', error);
+        });
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}Welcome to Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <section class="hero">
+        <h1>Welcome to the Telemedicine Platform</h1>
+        <p class="lead">Get access to quality healthcare from the comfort of your home</p>
+        {% if not user.is_authenticated %}
+            <div class="cta-buttons">
+                <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+                <a href="{% url 'register' %}" class="btn btn-secondary">Register</a>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="features">
+        <h2>Our Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>Video Consultations</h3>
+                <p>Connect with doctors through secure video calls</p>
+            </div>
+            <div class="feature-card">
+                <h3>Digital Health Records</h3>
+                <p>Access your medical records anytime, anywhere</p>
+            </div>
+            <div class="feature-card">
+                <h3>Medicine Tracking</h3>
+                <p>Check medicine availability at local pharmacies</p>
+            </div>
+            <div class="feature-card">
+                <h3>AI Symptom Checker</h3>
+                <p>Get initial health assessments instantly</p>
+            </div>
+        </div>
+    </section>
+
+    {% if user.is_authenticated %}
+        <section class="dashboard-link">
+            {% if user.is_doctor %}
+                <a href="{% url 'doctor_dashboard' %}" class="btn btn-primary">Go to Doctor Dashboard</a>
+            {% else %}
+                <a href="{% url 'patient_dashboard' %}" class="btn btn-primary">Go to Patient Dashboard</a>
+            {% endif %}
+        </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.hero {
+    text-align: center;
+    padding: 4rem 0;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 3rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.lead {
+    font-size: 1.25rem;
+    color: #6c757d;
+    margin-bottom: 2rem;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.features {
+    margin-bottom: 3rem;
+}
+
+.features h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.feature-card {
+    padding: 1.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.feature-card h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.dashboard-link {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+</style>
+{% endblock %}

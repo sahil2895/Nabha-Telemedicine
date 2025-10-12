@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Consultation - Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="meeting-container">
+    <div class="meeting-header">
+        <h1>Video Consultation</h1>
+        <div class="meeting-info">
+            <p><strong>Patient:</strong> <span id="patient-name"></span></p>
+            <p><strong>Time:</strong> <span id="meeting-time"></span></p>
+        </div>
+    </div>
+
+    <div class="video-grid">
+        <div class="video-container doctor">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="name-tag">You (Doctor)</div>
+        </div>
+        <div class="video-container patient">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="name-tag" id="remote-name">Patient</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="toggleVideo" class="btn control-btn">
+            <i class="fas fa-video"></i>
+        </button>
+        <button id="toggleAudio" class="btn control-btn">
+            <i class="fas fa-microphone"></i>
+        </button>
+        <button id="endCall" class="btn control-btn danger">
+            End Call
+        </button>
+    </div>
+
+    <div class="consultation-panel">
+        <div class="notes-section">
+            <h3>Consultation Notes</h3>
+            <textarea id="consultationNotes" placeholder="Take notes during the consultation..."></textarea>
+        </div>
+        
+        <div class="prescription-section">
+            <h3>Prescription</h3>
+            <form id="prescriptionForm">
+                <div class="form-group">
+                    <label for="diagnosis">Diagnosis:</label>
+                    <textarea id="diagnosis" name="diagnosis" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="prescription">Prescription:</label>
+                    <textarea id="prescription" name="prescription" required></textarea>
+                </div>
+                <button type="submit" class="btn">Save Prescription</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.meeting-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.meeting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.video-container {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.name-tag {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.control-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.control-btn.danger {
+    background-color: #dc3545;
+}
+
+.consultation-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.notes-section, .prescription-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+textarea {
+    width: 100%;
+    min-height: 150px;
+    margin: 1rem 0;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let peerConnection;
+let localStream;
+const appointmentId = new URLSearchParams(window.location.search).get('appointment_id');
+
+async function initializeCall() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+        document.getElementById('localVideo').srcObject = localStream;
+        
+        // Initialize WebRTC connection
+        setupWebRTC();
+        
+        // Load appointment details
+        loadAppointmentDetails();
+    } catch (error) {
+        console.error('Error accessing media devices:', error);
+        alert('Failed to access camera and microphone');
+    }
+}
+
+function setupWebRTC() {
+    // WebRTC configuration would go here
+    // This is a placeholder for the actual WebRTC implementation
+    console.log('WebRTC setup would happen here');
+}
+
+function loadAppointmentDetails() {
+    if (!appointmentId) return;
+    
+    fetch(`/api/appointments/${appointmentId}/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('patient-name').textContent = 
+                `${data.patient.user.first_name} ${data.patient.user.last_name}`;
+            document.getElementById('meeting-time').textContent = 
+                `${data.date} ${data.time}`;
+        })
+        .catch(error => {
+            console.error('Error loading appointment details:', error);
+        });
+}
+
+document.getElementById('toggleVideo').addEventListener('click', function() {
+    if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            this.querySelector('i').className = 
+                videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+        }
+    }
+});
+
+document.getElementById('toggleAudio').addEventListener('click', function() {
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            this.querySelector('i').className = 
+                audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+        }
+    }
+});
+
+document.getElementById('endCall').addEventListener('click', function() {
+    if (confirm('Are you sure you want to end the call?')) {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        window.location.href = '/doctor/dashboard/';
+    }
+});
+
+document.getElementById('prescriptionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const diagnosis = document.getElementById('diagnosis').value;
+    const prescription = document.getElementById('prescription').value;
+    
+    fetch('/api/prescriptions/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            appointment_id: appointmentId,
+            diagnosis: diagnosis,
+            prescription: prescription
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Prescription saved successfully');
+        } else {
+            alert(data.error || 'Failed to save prescription');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to save prescription');
+    });
+});
+
+// Initialize the call when the page loads
+document.addEventListener('DOMContentLoaded', initializeCall);
+</script>
+{% endblock %}
+{% endblock %}

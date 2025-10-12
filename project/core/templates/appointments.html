@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}Appointments - Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="appointments-container">
+    <h1>Appointments</h1>
+
+    {% if user.is_patient %}
+    <div class="book-appointment">
+        <h2>Book New Appointment</h2>
+        <form id="appointment-form" method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="doctor">Select Doctor:</label>
+                <select name="doctor_id" id="doctor" required>
+                    <option value="">Choose a doctor...</option>
+                    {% for doctor in doctors %}
+                    <option value="{{ doctor.id }}">Dr. {{ doctor.user.get_full_name|default:doctor.user.username }} - {{ doctor.specialization }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="date">Date:</label>
+                <input type="date" name="date" id="date" required>
+            </div>
+            <div class="form-group">
+                <label for="time">Time:</label>
+                <input type="time" name="time" id="time" required>
+            </div>
+            <div class="form-group">
+                <label for="symptoms">Symptoms:</label>
+                <textarea name="symptoms" id="symptoms" rows="4"></textarea>
+            </div>
+            <button type="submit" class="btn">Book Appointment</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="appointments-list">
+        <h2>Your Appointments</h2>
+        {% if appointments %}
+            {% for appointment in appointments %}
+                <div class="appointment-card">
+                    {% if user.is_patient %}
+                        <h3>Dr. {{ appointment.doctor.user.get_full_name|default:appointment.doctor.user.username }}</h3>
+                        <p><strong>Specialization:</strong> {{ appointment.doctor.specialization }}</p>
+                    {% else %}
+                        <h3>{{ appointment.patient.user.get_full_name|default:appointment.patient.user.username }}</h3>
+                    {% endif %}
+                    <p><strong>Date:</strong> {{ appointment.date }}</p>
+                    <p><strong>Time:</strong> {{ appointment.time }}</p>
+                    <p><strong>Status:</strong> <span class="status {{ appointment.status }}">{{ appointment.status|title }}</span></p>
+                    {% if appointment.symptoms %}
+                        <p><strong>Symptoms:</strong> {{ appointment.symptoms }}</p>
+                    {% endif %}
+                    {% if appointment.diagnosis %}
+                        <p><strong>Diagnosis:</strong> {{ appointment.diagnosis }}</p>
+                    {% endif %}
+                    {% if appointment.prescription %}
+                        <p><strong>Prescription:</strong> {{ appointment.prescription }}</p>
+                    {% endif %}
+                    {% if appointment.meeting_link and appointment.status == 'confirmed' %}
+                        <a href="{{ appointment.meeting_link }}" class="btn" target="_blank">Join Meeting</a>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No appointments found.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.appointments-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.book-appointment {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.appointments-list {
+    margin-top: 2rem;
+}
+
+.appointment-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+}
+
+.appointment-card h3 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+.appointment-card p {
+    margin-bottom: 0.5rem;
+}
+
+#appointment-form .form-group {
+    margin-bottom: 1rem;
+}
+
+#appointment-form select,
+#appointment-form input[type="date"],
+#appointment-form input[type="time"],
+#appointment-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#appointment-form textarea {
+    resize: vertical;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('appointment-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/appointments/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.error || 'Failed to book appointment');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to book appointment');
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

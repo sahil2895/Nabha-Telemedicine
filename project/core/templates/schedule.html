@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Schedule - Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="schedule-container">
+    <h1>Manage Your Schedule</h1>
+
+    <div class="schedule-grid">
+        <div class="current-schedule">
+            <h2>Current Schedule</h2>
+            <div id="current-schedule">
+                Loading...
+            </div>
+        </div>
+
+        <div class="schedule-editor">
+            <h2>Update Schedule</h2>
+            <form id="scheduleForm">
+                {% for day in days %}
+                <div class="day-schedule">
+                    <h3>{{ day|title }}</h3>
+                    <div class="time-slots">
+                        <div class="form-group">
+                            <label for="{{ day }}-morning">Morning:</label>
+                            <input type="text" id="{{ day }}-morning" 
+                                   placeholder="e.g., 09:00-12:00"
+                                   pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]-([01]?[0-9]|2[0-3]):[0-5][0-9]">
+                        </div>
+                        <div class="form-group">
+                            <label for="{{ day }}-afternoon">Afternoon:</label>
+                            <input type="text" id="{{ day }}-afternoon" 
+                                   placeholder="e.g., 14:00-17:00"
+                                   pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]-([01]?[0-9]|2[0-3]):[0-5][0-9]">
+                        </div>
+                    </div>
+                    <div class="day-controls">
+                        <label>
+                            <input type="checkbox" class="day-off" data-day="{{ day }}">
+                            Day Off
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Update Schedule</button>
+            </form>
+        </div>
+
+        <div class="upcoming-appointments">
+            <h2>Upcoming Appointments</h2>
+            <div id="appointments-list">
+                Loading...
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.schedule-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.current-schedule, .schedule-editor, .upcoming-appointments {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.day-schedule {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.time-slots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.day-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.schedule-display {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+}
+
+.schedule-display .day {
+    font-weight: bold;
+}
+
+.appointments-list {
+    margin-top: 1rem;
+}
+
+.appointment-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.appointment-item:last-child {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+function loadCurrentSchedule() {
+    fetch('/api/doctor/schedule/')
+        .then(response => response.json())
+        .then(data => {
+            const scheduleDiv = document.getElementById('current-schedule');
+            if (data.available_times && Object.keys(data.available_times).length > 0) {
+                scheduleDiv.innerHTML = `
+                    <div class="schedule-display">
+                        ${Object.entries(data.available_times).map(([day, times]) => `
+                            <div class="schedule-row">
+                                <div class="day">${day.charAt(0).toUpperCase() + day.slice(1)}</div>
+                                <div class="times">${times}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                // Pre-fill the form with current schedule
+                Object.entries(data.available_times).forEach(([day, times]) => {
+                    const timeRanges = times.split(',').map(t => t.trim());
+                    if (timeRanges[0]) {
+                        document.getElementById(`${day}-morning`).value = timeRanges[0];
+                    }
+                    if (timeRanges[1]) {
+                        document.getElementById(`${day}-afternoon`).value = timeRanges[1];
+                    }
+                });
+            } else {
+                scheduleDiv.innerHTML = '<p>No schedule set</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('current-schedule').innerHTML = 
+                '<p>Failed to load schedule</p>';
+        });
+}
+
+function loadUpcomingAppointments() {
+    fetch('/api/appointments/')
+        .then(response => response.json())
+        .then(data => {
+            const appointmentsDiv = document.getElementById('appointments-list');
+            if (data.length > 0) {
+                appointmentsDiv.innerHTML = data.map(apt => `
+                    <div class="appointment-item">
+                        <h4>${apt.patient.user.first_name} ${apt.patient.user.last_name}</h4>
+                        <p><strong>Date:</strong> ${apt.date}</p>
+                        <p><strong>Time:</strong> ${apt.time}</p>
+                        <p><strong>Status:</strong> ${apt.status}</p>
+                    </div>
+                `).join('');
+            } else {
+                appointmentsDiv.innerHTML = '<p>No upcoming appointments</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('appointments-list').innerHTML = 
+                '<p>Failed to load appointments</p>';
+        });
+}
+
+document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const schedule = {};
+    days.forEach(day => {
+        if (!document.querySelector(`[data-day="${day}"]`).checked) {
+            const morning = document.getElementById(`${day}-morning`).value;
+            const afternoon = document.getElementById(`${day}-afternoon`).value;
+            const times = [morning, afternoon].filter(Boolean);
+            if (times.length > 0) {
+                schedule[day] = times.join(', ');
+            }
+        }
+    });
+    
+    fetch('/api/doctor/schedule/update/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ available_times: schedule })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Schedule updated successfully');
+            loadCurrentSchedule();
+        } else {
+            alert(data.error || 'Failed to update schedule');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to update schedule');
+    });
+});
+
+// Handle day off checkboxes
+document.querySelectorAll('.day-off').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const day = this.dataset.day;
+        const inputs = document.querySelectorAll(`#${day}-morning, #${day}-afternoon`);
+        inputs.forEach(input => {
+            input.disabled = this.checked;
+            if (this.checked) {
+                input.value = '';
+            }
+        });
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadCurrentSchedule();
+    loadUpcomingAppointments();
+});
+</script>
+{% endblock %}
+{% endblock %}

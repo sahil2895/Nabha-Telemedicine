@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Records - Telemedicine Platform{% endblock %}
+
+{% block content %}
+<div class="records-container">
+    <div class="sidebar">
+        <div class="search-box">
+            <input type="text" id="patient-search" placeholder="Search patients...">
+        </div>
+        <div class="patients-list" id="patients-list">
+            Loading patients...
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="patient-details">
+            <div class="placeholder">
+                <h2>Select a patient to view their records</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.records-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+    height: calc(100vh - 64px);
+    padding: 2rem;
+}
+
+.sidebar {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.search-box {
+    padding: 1rem;
+    border-bottom: 1px solid #ddd;
+}
+
+#patient-search {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.patients-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.patient-item {
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.patient-item:hover {
+    background-color: #f5f5f5;
+}
+
+.patient-item.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.main-content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+}
+
+.patient-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.records-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.record-section {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.record-item {
+    border-bottom: 1px solid #ddd;
+    padding: 1rem 0;
+}
+
+.record-item:last-child {
+    border-bottom: none;
+}
+
+.new-record-form {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #ddd;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedPatientId = null;
+
+function loadPatients() {
+    fetch('/api/patients/list/')
+        .then(response => response.json())
+        .then(data => {
+            const patientsList = document.getElementById('patients-list');
+            patientsList.innerHTML = data.map(patient => `
+                <div class="patient-item" data-id="${patient.id}" 
+                     onclick="selectPatient('${patient.id}')">
+                    <h4>${patient.user.first_name} ${patient.user.last_name}</h4>
+                    <small>${patient.user.email}</small>
+                </div>
+            `).join('');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('patients-list').innerHTML = 
+                '<p>Failed to load patients</p>';
+        });
+}
+
+function selectPatient(patientId) {
+    selectedPatientId = patientId;
+    
+    // Update active state in sidebar
+    document.querySelectorAll('.patient-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.querySelector(`.patient-item[data-id="${patientId}"]`).classList.add('active');
+    
+    // Load patient details
+    fetch(`/api/patients/records/?patient_id=${patientId}`)
+        .then(response => response.json())
+        .then(data => {
+            const detailsDiv = document.getElementById('patient-details');
+            detailsDiv.innerHTML = `
+                <div class="patient-header">
+                    <div>
+                        <h2>${data.patient.user.first_name} ${data.patient.user.last_name}</h2>
+                        <p>Email: ${data.patient.user.email}</p>
+                    </div>
+                    <button class="btn" onclick="showNewRecordForm()">Add Record</button>
+                </div>
+
+                <div class="records-grid">
+                    <div class="record-section">
+                        <h3>Personal Information</h3>
+                        <div class="record-item">
+                            <p><strong>Date of Birth:</strong> ${data.patient.date_of_birth || 'Not provided'}</p>
+                            <p><strong>Blood Group:</strong> ${data.patient.blood_group || 'Not provided'}</p>
+                            <p><strong>Emergency Contact:</strong> ${data.patient.emergency_contact || 'Not provided'}</p>
+                        </div>
+                    </div>
+
+                    <div class="record-section">
+                        <h3>Health Records</h3>
+                        ${data.health_records.length ? data.health_records.map(record => `
+                            <div class="record-item">
+                                <h4>${record.record_type}</h4>
+                                <p><strong>Date:</strong> ${record.date}</p>
+                                <p>${record.description}</p>
+                                <a href="${record.file}" target="_blank" class="btn btn-sm">View File</a>
+                            </div>
+                        `).join('') : '<p>No health records available</p>'}
+                    </div>
+
+                    <div class="record-section">
+                        <h3>Appointment History</h3>
+                        ${data.appointments.length ? data.appointments.map(apt => `
+                            <div class="record-item">
+                                <p><strong>Date:</strong> ${apt.date} ${apt.time}</p>
+                                <p><strong>Status:</strong> ${apt.status}</p>
+                                ${apt.diagnosis ? `<p><strong>Diagnosis:</strong> ${apt.diagnosis}</p>` : ''}
+                                ${apt.prescription ? `<p><strong>Prescription:</strong> ${apt.prescription}</p>` : ''}
+                            </div>
+                        `).join('') : '<p>No appointment history</p>'}
+                    </div>
+                </div>
+
+                <div id="new-record-form" style="display: none;" class="new-record-form">
+                    <h3>Add New Record</h3>
+                    <form id="recordForm" onsubmit="saveNewRecord(event)">
+                        <div class="form-group">
+                            <label for="record-type">Record Type:</label>
+                            <input type="text" id="record-type" required 
+                                   placeholder="e.g., Blood Test, X-Ray, Prescription">
+                        </div>
+                        <div class="form-group">
+                            <label for="record-description">Description:</label>
+                            <textarea id="record-description" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="record-file">File:</label>
+                            <input type="file" id="record-file" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="record-private">
+                                Make this record private
+                            </label>
+                        </div>
+                        <button type="submit" class="btn">Save Record</button>
+                        <button type="button" class="btn btn-secondary" 
+                                onclick="hideNewRecordForm()">Cancel</button>
+                    </form>
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('patient-details').innerHTML = 
+                '<p>Failed to load patient details</p>';
+        });
+}
+
+function showNewRecordForm() {
+    document.getElementById('new-record-form').style.display = 'block';
+}
+
+function hideNewRecordForm() {
+    document.getElementById('new-record-form').style.display = 'none';
+}
+
+async function saveNewRecord(event) {
+    event.preventDefault();
+    
+    const formData = new FormData();
+    formData.append('patient_id', selectedPatientId);
+    formData.append('record_type', document.getElementById('record-type').value);
+    formData.append('description', document.getElementById('record-description').value);
+    formData.append('file', document.getElementById('record-file').files[0]);
+    formData.append('is_private', document.getElementById('record-private').checked);
+    
+    try {
+        const response = await fetch('/api/health-records/create/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            alert('Record added successfully');
+            hideNewRecordForm();
+            selectPatient(selectedPatientId); // Refresh the view
+        } else {
+            alert(data.error || 'Failed to add record');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to add record');
+    }
+}
+
+document.getElementById('patient-search').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    document.querySelectorAll('.patient-item').forEach(item => {
+        const name = item.querySelector('h4').textContent.toLowerCase();
+        const email = item.querySelector('small').textContent.toLowerCase();
+        if (name.includes(searchTerm) || email.includes(searchTerm)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', loadPatients);
+</script>
+{% endblock %}
+{% endblock %}
