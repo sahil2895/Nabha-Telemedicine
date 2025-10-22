@@ -55,6 +55,3 @@ Our system provides **multi-doctor appointment booking, AI-driven health assista
 | **Maps & Location** | Leaflet.js / Google Maps API |
 | **Languages Supported** | English, Hindi, Punjabi |
 
----
-
-## 🗂️ Project Structure
